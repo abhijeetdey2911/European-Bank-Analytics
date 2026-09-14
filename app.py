@@ -20,42 +20,35 @@ import streamlit as st
 # =========================================================
 
 st.set_page_config(
-    page_title="European Bank Analytics",
-    page_icon="EB",
+    page_title="European Bank Customer Analytics",
+    page_icon="🏦",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
 
 # =========================================================
-# COLOR PALETTE
+# COLOR PALETTE (Enterprise Bloomberg / Modern Financial Theme)
 # =========================================================
 
-NAVY = "#161E2F"
-NAVY_2 = "#242F49"
-SLATE = "#384358"
-PEACH = "#FFA586"
-RED = "#D51A29"
-BURGUNDY = "#541A2E"
+BG_DARK = "#0B0F17"          # Deep near-black background
+SURFACE = "#121824"          # Card & panel surface
+SURFACE_HOVER = "#182030"    # Hover surface
+BORDER = "#1E293B"           # Subtle container border
 
-WHITE = "#F5F7FA"
-MUTED = "#8D98AB"
-BORDER = "#29354A"
-DARK = "#0D1421"
+RED = "#E52335"              # Primary European Bank Accent Red
+RED_MUTED = "rgba(229, 35, 53, 0.15)"
+
+WHITE = "#F8FAFC"            # Primary text
+TEXT_MUTED = "#94A3B8"       # Secondary labels & subtitles
+TEXT_DARK = "#64748B"        # Captions & quiet text
+
+SLATE_BAR = "#334155"       # Base bar color for neutral/stayed metrics
+BLUE_ACCENT = "#3B82F6"      # Positive / secondary accent
 
 
 # =========================================================
 # HTML RENDERING HELPERS
-# ---------------------------------------------------------
-# Streamlit runs every st.markdown string through its Markdown
-# parser first. Lines indented 4+ spaces are parsed as an
-# indented CODE BLOCK and printed as raw text, and blank lines
-# between tags split the HTML into separate Markdown chunks.
-# The helpers below normalize every HTML string before sending
-# it to st.markdown(..., unsafe_allow_html=True):
-#   - leading/trailing whitespace is stripped from every line
-#   - blank lines are removed
-# so HTML can never be mistaken for a code block again.
 # =========================================================
 
 def _clean_html(content: str) -> str:
@@ -68,12 +61,12 @@ def _clean_html(content: str) -> str:
 
 
 def html(content: str) -> None:
-    """Render a normalized HTML string safely."""
+    """Render a normalized HTML string safely without markdown codeblock triggering."""
     st.markdown(_clean_html(content), unsafe_allow_html=True)
 
 
 # =========================================================
-# SVG ICON SYSTEM (lucide-style inline icons, no dependencies)
+# SVG ICON SYSTEM (Inline crisp SVG icons)
 # =========================================================
 
 ICONS = {
@@ -92,10 +85,11 @@ ICONS = {
     "document": '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/>',
     "database": '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v7c0 1.66 3.58 3 8 3s8-1.34 8-3V5"/><path d="M4 12v7c0 1.66 3.58 3 8 3s8-1.34 8-3v-7"/>',
     "download": '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
+    "building": '<rect x="4" y="2" width="16" height="20" rx="2" ry="2"/><line x1="9" y1="6" x2="9" y2="6"/><line x1="15" y1="6" x2="15" y2="6"/><line x1="9" y1="10" x2="9" y2="10"/><line x1="15" y1="10" x2="15" y2="10"/><line x1="9" y1="14" x2="9" y2="14"/><line x1="15" y1="14" x2="15" y2="14"/><line x1="9" y1="18" x2="15" y2="18"/>',
 }
 
 
-def icon(name: str, size: int = 20, color: str = PEACH) -> str:
+def icon(name: str, size: int = 16, color: str = RED) -> str:
     """Return a single-line inline SVG icon string."""
     body = ICONS.get(name, "")
     return (
@@ -106,13 +100,12 @@ def icon(name: str, size: int = 20, color: str = PEACH) -> str:
 
 
 # =========================================================
-# CHART HELPERS (matplotlib rendered to base64 PNG so each
-# panel is ONE complete HTML block - no split div tags)
+# CHART HELPERS (High-DPI Matplotlib PNGs)
 # =========================================================
 
 def fig_to_png(fig) -> str:
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=170, bbox_inches="tight", transparent=True)
+    fig.savefig(buf, format="png", dpi=180, bbox_inches="tight", transparent=True)
     plt.close(fig)
     return base64.b64encode(buf.getvalue()).decode()
 
@@ -120,69 +113,82 @@ def fig_to_png(fig) -> str:
 def _style_axes(ax) -> None:
     for side in ("top", "right", "left"):
         ax.spines[side].set_visible(False)
-    ax.spines["bottom"].set_color(SLATE)
-    ax.tick_params(colors=MUTED, labelsize=9, length=0)
-    ax.grid(axis="y", color=BORDER, linewidth=0.8, alpha=0.55)
+    ax.spines["bottom"].set_color(BORDER)
+    ax.spines["bottom"].set_linewidth(1)
+    ax.tick_params(colors=TEXT_MUTED, labelsize=8.5, length=0, pad=4)
+    ax.grid(axis="y", color=BORDER, linewidth=0.8, alpha=0.4)
     ax.set_axisbelow(True)
 
 
-def bar_chart_png(series, color=RED, figsize=(6.4, 3.2), fmt="{:.1f}%") -> str:
-    """Render a vertical bar chart as a base64 PNG string."""
+def bar_chart_png(series, color=RED, figsize=(5.5, 2.1), fmt="{:.1f}%") -> str:
+    """Render a clean vertical bar chart as a base64 PNG string."""
     fig, ax = plt.subplots(figsize=figsize)
     fig.patch.set_alpha(0)
     ax.set_facecolor("none")
     _style_axes(ax)
+
     labels = [str(i) for i in series.index]
     values = [float(v) for v in series.values]
-    bars = ax.bar(labels, values, color=color, width=0.55, zorder=3)
+    bar_colors = color if isinstance(color, (list, tuple)) else color
+
+    bars = ax.bar(labels, values, color=bar_colors, width=0.45, zorder=3)
     top = max(values) if values else 1.0
+
     for bar, value in zip(bars, values):
         ax.text(
             bar.get_x() + bar.get_width() / 2,
-            value,
+            value + (top * 0.03 if top > 0 else 0.1),
             fmt.format(value),
             ha="center",
             va="bottom",
             color=WHITE,
-            fontsize=9,
+            fontsize=8.5,
             fontweight="bold",
         )
-    ax.set_ylim(0, top * 1.28 if top > 0 else 1)
+
+    ax.set_ylim(0, top * 1.24 if top > 0 else 1)
     return fig_to_png(fig)
 
 
 def donut_png(values, labels, center_value, center_label,
-              colors=(PEACH, RED)) -> str:
+              colors=(SLATE_BAR, RED)) -> str:
     """Render a compact donut chart as a base64 PNG string."""
-    fig, ax = plt.subplots(figsize=(4.6, 2.5))
+    fig, ax = plt.subplots(figsize=(4.0, 2.0))
     fig.patch.set_alpha(0)
     ax.set_facecolor("none")
-    ax.pie(
+
+    wedges, texts, autotexts = ax.pie(
         values,
         labels=labels,
         startangle=90,
         counterclock=False,
-        wedgeprops={"width": 0.34, "edgecolor": DARK},
+        wedgeprops={"width": 0.36, "edgecolor": SURFACE, "linewidth": 2.0},
         colors=list(colors),
         autopct="%1.1f%%",
-        textprops={"color": WHITE, "fontsize": 9},
+        pctdistance=0.76,
+        textprops={"color": WHITE, "fontsize": 8.0, "fontweight": "bold"},
     )
-    ax.text(0, 0.07, center_value, ha="center", va="center",
-            color=WHITE, fontsize=17, fontweight="bold")
-    ax.text(0, -0.14, center_label, ha="center", va="center",
-            color=MUTED, fontsize=8)
+
+    for text in texts:
+        text.set_color(TEXT_MUTED)
+        text.set_fontsize(8.0)
+
+    ax.text(0, 0.08, center_value, ha="center", va="center",
+            color=WHITE, fontsize=15, fontweight="bold")
+    ax.text(0, -0.15, center_label, ha="center", va="center",
+            color=TEXT_MUTED, fontsize=8.0)
     return fig_to_png(fig)
 
 
 # =========================================================
-# UI BUILDERS (each returns/renders one COMPLETE html block)
+# UI BUILDERS (Structured Layout Rhythm & Spacing)
 # =========================================================
 
 def panel_heading(icon_name, title, subtitle=""):
     sub = f"<div class='section-subtitle'>{subtitle}</div>" if subtitle else ""
     return (
         "<div class='section-heading'>"
-        f"<div class='section-icon'>{icon(icon_name, 20, PEACH)}</div>"
+        f"<div class='section-icon'>{icon(icon_name, 14, RED)}</div>"
         f"<div><div class='section-title'>{title}</div>{sub}</div>"
         "</div>"
     )
@@ -209,11 +215,12 @@ def table_panel(icon_name, title, subtitle, table_html, panel_class=""):
 
 
 def html_table(df, numeric_cols=()):
-    """Convert a small DataFrame into a styled HTML table string."""
+    """Convert a DataFrame into a structured enterprise HTML table string."""
     headers = []
     for col in df.columns:
         cls = " class='num'" if col in numeric_cols else ""
         headers.append(f"<th{cls}>{col}</th>")
+
     rows = []
     for _, row in df.iterrows():
         cells = []
@@ -221,36 +228,47 @@ def html_table(df, numeric_cols=()):
             cls = " class='num'" if col in numeric_cols else ""
             cells.append(f"<td{cls}>{row[col]}</td>")
         rows.append("<tr>" + "".join(cells) + "</tr>")
+
     return (
-        "<table class='data-table'><thead><tr>"
+        "<div class='table-wrapper'><table class='data-table'><thead><tr>"
         + "".join(headers)
         + "</tr></thead><tbody>"
         + "".join(rows)
-        + "</tbody></table>"
+        + "</tbody></table></div>"
     )
 
 
-def kpi_card(icon_name, label, value, note):
-    """Return one complete KPI card HTML block."""
+def kpi_card(icon_name, label, value, note, tag="METRIC", is_risk=False):
+    """Return one compact enterprise KPI card with 16px internal padding."""
+    card_class = "kpi-card risk-card" if is_risk else "kpi-card"
+    tag_class = "kpi-tag risk-tag" if is_risk else "kpi-tag"
+
     return f"""
-    <div class="kpi-card">
-        <div class="kpi-top">
-            <div>
-                <div class="kpi-label">{label}</div>
-                <div class="kpi-value">{value}</div>
-            </div>
-            <div class="kpi-icon">{icon(icon_name, 20, PEACH)}</div>
+    <div class="{card_class}">
+        <div class="kpi-header">
+            <span class="kpi-label">{label}</span>
+            <span class="{tag_class}">{tag}</span>
+        </div>
+        <div class="kpi-body">
+            <div class="kpi-value">{value}</div>
+            <div class="kpi-icon-badge">{icon(icon_name, 16, RED)}</div>
         </div>
         <div class="kpi-note">{note}</div>
     </div>
     """
 
 
-def insight_card(icon_name, title, text):
-    """Return one complete insight card HTML block."""
+def insight_card(icon_name, title, text, tag="INSIGHT", is_risk=False):
+    """Return one actionable insight card with structured 16px internal padding."""
+    card_class = "insight-card risk-insight" if is_risk else "insight-card"
+    tag_class = "insight-tag risk-tag" if is_risk else "insight-tag"
+
     return f"""
-    <div class="insight-card">
-        <div class="insight-icon">{icon(icon_name, 18, PEACH)}</div>
+    <div class="{card_class}">
+        <div class="insight-header">
+            <div class="insight-icon-wrapper">{icon(icon_name, 14, RED)}</div>
+            <span class="{tag_class}">{tag}</span>
+        </div>
         <div class="insight-title">{title}</div>
         <div class="insight-text">{text}</div>
     </div>
@@ -258,293 +276,573 @@ def insight_card(icon_name, title, text):
 
 
 # =========================================================
-# CUSTOM CSS (plain string - passed with unsafe_allow_html)
+# SYSTEMATIC SPACING & LAYOUT STYLESHEET
 # =========================================================
 
 st.markdown("""
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 html, body, [class*="css"], .stApp, button, input, select, textarea {
-    font-family: "Segoe UI", "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
 }
+
 .stApp {
-    background:
-        radial-gradient(1100px 520px at 75% -12%, rgba(84,26,46,0.30), rgba(0,0,0,0)),
-        #0D1421;
-    color: #F5F7FA;
+    background-color: #0B0F17;
+    color: #F8FAFC;
 }
+
 [data-testid="stHeader"] { background: transparent; }
+
+/* 28px - 32px Horizontal Page Margin */
 [data-testid="stMainBlockContainer"] {
-    padding: 1.1rem 1.7rem 2.4rem;
+    padding: 1.25rem 2rem 2.5rem;
+    max-width: 1580px;
 }
-div[data-testid="stHorizontalBlock"] { gap: 1rem; align-items: stretch; }
+
+/* Horizontal Grid Gutter System (22px horizontal gap between cards) */
+div[data-testid="stHorizontalBlock"] { gap: 1.35rem; align-items: stretch; }
 div[data-testid="stHorizontalBlock"] > div {
     display: flex;
     flex-direction: column;
 }
 div[data-testid="stHorizontalBlock"] > div > div { flex: 1 1 auto; }
-div[data-testid="stVerticalBlock"] { gap: 0.65rem; }
+
+/* Main Vertical Block Gap (20px vertical spacing) */
+div[data-testid="stVerticalBlock"] { gap: 1.25rem; }
 
 /* =====================================================
-   SIDEBAR - native Streamlit sidebar, fixed width
+   SIDEBAR - Systematic Navigation & Filter Spacing
    ===================================================== */
 [data-testid="stSidebar"] {
-    min-width: 258px;
-    max-width: 258px;
-    background: linear-gradient(180deg, #161E2F 0%, #0D1421 100%);
-    border-right: 1px solid #29354A;
+    min-width: 255px;
+    max-width: 255px;
+    background-color: #0E131F;
+    border-right: 1px solid #1E293B;
 }
-.brand { display: flex; align-items: center; gap: 11px; padding: 4px 0 12px 0; }
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0 16px 0;
+    border-bottom: 1px solid #1E293B;
+    margin-bottom: 18px;
+}
+
 .brand-mark {
-    width: 38px;
-    height: 38px;
-    border-radius: 11px;
-    background: linear-gradient(135deg, #D51A29, #541A2E);
+    width: 34px;
+    height: 34px;
+    border-radius: 6px;
+    background: #E52335;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    box-shadow: 0 8px 18px rgba(213,26,41,0.25);
+    box-shadow: 0 4px 12px rgba(229, 35, 53, 0.3);
 }
-.brand-name { color: #F5F7FA; font-size: 14px; font-weight: 700; letter-spacing: -0.2px; }
-.brand-sub { color: #8D98AB; font-size: 9.5px; letter-spacing: 1.5px; text-transform: uppercase; }
-.side-label {
-    font-size: 10px;
-    letter-spacing: 1.5px;
-    color: #69758A;
+
+.brand-name {
+    color: #F8FAFC;
+    font-size: 13.5px;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+    line-height: 1.15;
+}
+
+.brand-sub {
+    color: #94A3B8;
+    font-size: 8.5px;
+    letter-spacing: 1.2px;
     text-transform: uppercase;
-    margin: 2px 0 8px 4px;
+    font-weight: 600;
 }
+
+.side-label {
+    font-size: 9.5px;
+    letter-spacing: 1.3px;
+    color: #64748B;
+    text-transform: uppercase;
+    font-weight: 700;
+    margin: 10px 0 8px 2px;
+}
+
+/* Radio Group (Navigation Items with 4px gap) */
+div[role="radiogroup"] {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
 div[role="radiogroup"] label {
     background: transparent;
     border: 1px solid transparent;
-    border-radius: 9px;
-    padding: 6px 10px;
-    margin: 1px 0;
-    transition: 0.2s ease;
-}
-div[role="radiogroup"] label:hover { background: rgba(255,255,255,0.04); border-color: #29354A; }
-div[role="radiogroup"] label p { color: #AEB7C6; font-size: 12px; }
-div[role="radiogroup"] label:has(input:checked) {
-    background: linear-gradient(90deg, #D51A29, #541A2E);
-    border-color: rgba(255,165,134,0.12);
-}
-div[role="radiogroup"] label:has(input:checked) p { color: #FFFFFF; font-weight: 600; }
-[data-testid="stSidebar"] label {
-    color: #9EA8B8;
-    font-size: 11px;
-}
-[data-testid="stSidebar"] p {
-    color: #AEB7C6;
-    font-size: 12px;
+    border-left: 3px solid transparent;
+    border-radius: 5px;
+    padding: 7px 12px;
+    margin: 0;
+    transition: all 0.15s ease;
+    cursor: pointer;
 }
 
-/* TOP BAR */
+div[role="radiogroup"] label:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+div[role="radiogroup"] label p {
+    color: #94A3B8;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+div[role="radiogroup"] label:has(input:checked) {
+    background: #162032;
+    border-left: 3px solid #E52335;
+}
+
+div[role="radiogroup"] label:has(input:checked) p {
+    color: #F8FAFC;
+    font-weight: 600;
+}
+
+[data-testid="stSidebar"] label {
+    color: #94A3B8;
+    font-size: 10.5px;
+    font-weight: 500;
+    margin-bottom: 6px;
+}
+
+/* Sidebar Widgets: 20px Vertical Buffer Between Filter Groups */
+[data-testid="stSidebar"] div.stMultiSelect,
+[data-testid="stSidebar"] div.stSelectbox,
+[data-testid="stSidebar"] div.stSlider {
+    margin-bottom: 20px;
+}
+
+[data-testid="stSidebar"] [data-baseweb="select"] > div {
+    background-color: #121824;
+    border-color: #1E293B;
+    border-radius: 5px;
+    color: #F8FAFC;
+    font-size: 11.5px;
+    min-height: 34px;
+}
+
+[data-testid="stSidebar"] [data-baseweb="tag"] {
+    background-color: #1E293B;
+    border-radius: 3px;
+    padding: 2px 7px;
+    margin-top: 4px;
+}
+
+[data-testid="stSidebar"] [data-baseweb="tag"] span {
+    color: #F8FAFC;
+    font-size: 10.5px;
+}
+
+[data-testid="stSidebar"] [data-baseweb="slider"] {
+    padding-top: 4px;
+}
+
+/* TOP BAR (20px Margin to Page Header) */
 .topbar {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 22px;
+    margin-bottom: 20px;
     flex-wrap: wrap;
     gap: 12px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid #1E293B;
 }
+
 .search-box {
     flex: 1 1 auto;
-    max-width: 62%;
-    height: 40px;
-    border: 1px solid #29354A;
-    border-radius: 20px;
-    background: rgba(9,15,26,0.65);
+    max-width: 480px;
+    height: 36px;
+    border: 1px solid #1E293B;
+    border-radius: 6px;
+    background: #121824;
     display: flex;
     align-items: center;
-    padding: 0 15px;
-    color: #778398;
-    font-size: 11px;
+    padding: 0 12px;
+    color: #64748B;
+    font-size: 11.5px;
+    transition: border-color 0.15s ease;
 }
-.profile { display: flex; align-items: center; gap: 11px; }
-.profile-date { color: #AEB7C6; font-size: 10.5px; }
-.profile-ring {
-    width: 32px;
-    height: 32px;
-    border: 1px solid #29354A;
+
+.search-box:hover {
+    border-color: #334155;
+}
+
+.profile {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.status-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(59, 130, 246, 0.08);
+    border: 1px solid rgba(59, 130, 246, 0.22);
+    padding: 4px 10px;
+    border-radius: 16px;
+    color: #60A5FA;
+    font-size: 10.5px;
+    font-weight: 500;
+}
+
+.status-dot {
+    width: 5px;
+    height: 5px;
     border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    background-color: #3B82F6;
+    box-shadow: 0 0 6px #3B82F6;
 }
+
 .avatar {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    background: #FFA586;
-    color: #541A2E;
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
+    background: #1E293B;
+    border: 1px solid #334155;
+    color: #F8FAFC;
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: 700;
     font-size: 10.5px;
+    letter-spacing: 0.5px;
 }
 
-/* HERO */
-.hero { padding: 2px 0 22px 0; }
-.eyebrow { color: #D51A29; font-size: 9.5px; letter-spacing: 2.2px; font-weight: 700; margin-bottom: 5px; }
-.hero-title { color: #F5F7FA; font-size: 28px; font-weight: 700; letter-spacing: -0.7px; line-height: 1.12; }
-.hero-subtitle { color: #9CA7B9; font-size: 12.5px; margin-top: 6px; }
+/* PAGE HERO HEADER (22px Margin to KPI Row) */
+.hero {
+    padding: 0 0 22px 0;
+}
 
-/* KPI CARDS - four equal, perfectly aligned cards */
+.eyebrow {
+    color: #E52335;
+    font-size: 9.5px;
+    letter-spacing: 1.8px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+}
+
+.hero-title {
+    color: #F8FAFC;
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.4px;
+    line-height: 1.15;
+}
+
+.hero-subtitle {
+    color: #94A3B8;
+    font-size: 12px;
+    margin-top: 4px;
+    font-weight: 400;
+}
+
+/* ENTERPRISE KPI CARDS (16px Card Padding, 22px Bottom Margin) */
 .kpi-card {
     position: relative;
-    overflow: hidden;
     display: flex;
     flex-direction: column;
-    height: 100%;
-    min-height: 106px;
-    padding: 16px;
-    border: 1px solid #29354A;
-    border-radius: 14px;
-    background: linear-gradient(145deg, rgba(36,47,73,0.86), rgba(22,30,47,0.96));
-    box-shadow: 0 12px 28px rgba(0,0,0,0.12);
-    box-sizing: border-box;
-}
-.kpi-card::after {
-    content: "";
-    position: absolute;
-    width: 88px;
-    height: 88px;
-    right: -40px;
-    bottom: -44px;
-    border-radius: 50%;
-    background: #D51A29;
-    opacity: 0.08;
-}
-.kpi-top {
-    display: flex;
-    align-items: flex-start;
     justify-content: space-between;
-    gap: 10px;
-    flex-shrink: 0;
+    height: 112px;
+    padding: 14px 16px;
+    border: 1px solid #1E293B;
+    border-radius: 8px;
+    background: #121824;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+    box-sizing: border-box;
+    transition: transform 0.15s ease, border-color 0.15s ease;
 }
-.kpi-label { color: #9EA8B8; font-size: 10.5px; margin-bottom: 5px; white-space: nowrap; }
-.kpi-value { color: #F5F7FA; font-size: 23px; font-weight: 700; letter-spacing: -0.4px; }
-.kpi-note { color: #6F7A8E; font-size: 9.5px; margin-top: auto; line-height: 1.35; }
-.kpi-icon {
-    width: 34px;
-    height: 34px;
-    border-radius: 10px;
-    background: rgba(213,26,41,0.14);
+
+.kpi-card:hover {
+    transform: translateY(-1px);
+    border-color: #334155;
+}
+
+.kpi-card.risk-card {
+    border-color: rgba(229, 35, 53, 0.28);
+    background: linear-gradient(180deg, rgba(229, 35, 53, 0.04) 0%, #121824 100%);
+}
+
+.kpi-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+}
+
+.kpi-label {
+    color: #94A3B8;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.kpi-tag {
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: rgba(148, 163, 184, 0.1);
+    color: #94A3B8;
+    letter-spacing: 0.4px;
+}
+
+.kpi-tag.risk-tag {
+    background: rgba(229, 35, 53, 0.14);
+    color: #F87171;
+    border: 1px solid rgba(229, 35, 53, 0.25);
+}
+
+.kpi-body {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.kpi-value {
+    color: #F8FAFC;
+    font-size: 25px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+}
+
+.kpi-icon-badge {
+    width: 30px;
+    height: 30px;
+    border-radius: 6px;
+    background: rgba(229, 35, 53, 0.08);
+    border: 1px solid rgba(229, 35, 53, 0.18);
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
 }
 
-/* PANELS */
+.kpi-note {
+    color: #64748B;
+    font-size: 10.5px;
+    margin-top: 8px;
+    line-height: 1.25;
+}
+
+/* PANELS & CONTAINER CARDS (16px Internal Padding, 22px Bottom Margin) */
 .panel {
-    background: linear-gradient(145deg, rgba(36,47,73,0.62), rgba(22,30,47,0.82));
-    border: 1px solid #29354A;
-    border-radius: 14px;
-    padding: 17px;
-    margin-bottom: 18px;
-    box-shadow: 0 12px 28px rgba(0,0,0,0.10);
+    background: #121824;
+    border: 1px solid #1E293B;
+    border-radius: 8px;
+    padding: 16px 18px;
+    margin-bottom: 22px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
     box-sizing: border-box;
     height: 100%;
+    transition: border-color 0.15s ease;
 }
-.panel-tall { min-height: 330px; }
-.section-heading { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+
+.panel:hover {
+    border-color: #334155;
+}
+
+.panel-tall { min-height: 260px; }
+
+.section-heading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
 .section-heading > div:last-child { flex: 1 1 auto; min-width: 0; }
+
 .section-icon {
-    width: 34px;
-    height: 34px;
-    border-radius: 9px;
-    background: rgba(213,26,41,0.13);
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    background: rgba(229, 35, 53, 0.1);
+    border: 1px solid rgba(229, 35, 53, 0.2);
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
 }
-.section-title { color: #F5F7FA; font-size: 14px; font-weight: 650; }
-.section-subtitle { color: #8D98AB; font-size: 10.5px; margin-top: 2px; }
+
+.section-title {
+    color: #F8FAFC;
+    font-size: 13.5px;
+    font-weight: 600;
+    letter-spacing: -0.2px;
+    line-height: 1.2;
+}
+
+.section-subtitle {
+    color: #94A3B8;
+    font-size: 10.5px;
+    margin-top: 3px;
+}
+
 .chart-fit {
     display: flex;
     justify-content: center;
     align-items: center;
-    margin-top: 3px;
-    height: 245px;
+    margin-top: 6px;
+    height: 190px;
 }
+
 .chart-fit img {
     width: 100%;
     height: 100%;
     object-fit: contain;
     display: block;
 }
-.chart-fit.donut-fit { justify-content: center; }
+
 .chart-fit.donut-fit img {
     object-fit: contain;
     max-width: 100%;
 }
 
-/* TABLES */
-.data-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+/* CUSTOMER SUMMARY TABLE (Structured Spacing) */
+.table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+    margin-top: 14px;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+}
+
 .data-table th {
     text-align: left;
-    color: #8D98AB;
+    color: #94A3B8;
     font-size: 9.5px;
+    font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.8px;
-    padding: 7px 9px;
-    border-bottom: 1px solid #29354A;
+    letter-spacing: 0.5px;
+    padding: 7.5px 10px;
+    border-bottom: 1px solid #1E293B;
+    background: rgba(255, 255, 255, 0.012);
 }
+
 .data-table td {
-    color: #DDE3EC;
-    padding: 8px 9px;
-    border-bottom: 1px solid rgba(41,53,74,0.55);
+    color: #E2E8F0;
+    padding: 7.5px 10px;
+    border-bottom: 1px solid rgba(30, 41, 59, 0.5);
 }
+
+.data-table tr:hover td {
+    background: rgba(255, 255, 255, 0.02);
+}
+
 .data-table tr:last-child td { border-bottom: none; }
 .data-table td.num, .data-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
 
-/* INSIGHT CARDS */
+/* ACTIONABLE INSIGHT CARDS (16px Padding, 28px Gap Above Section) */
+.insight-section-wrapper {
+    margin-top: 28px;
+}
+
 .insight-card {
-    border: 1px solid #29354A;
-    border-radius: 13px;
-    padding: 14px;
-    background: linear-gradient(145deg, rgba(56,67,88,0.35), rgba(22,30,47,0.85));
+    border: 1px solid #1E293B;
+    border-radius: 8px;
+    padding: 14px 16px;
+    background: #121824;
     height: 100%;
     box-sizing: border-box;
+    transition: transform 0.15s ease, border-color 0.15s ease;
 }
-.insight-icon {
-    width: 32px;
-    height: 32px;
-    border-radius: 9px;
-    background: rgba(255,165,134,0.12);
+
+.insight-card:hover {
+    transform: translateY(-1px);
+    border-color: #334155;
+}
+
+.insight-card.risk-insight {
+    border-color: rgba(229, 35, 53, 0.28);
+    background: linear-gradient(180deg, rgba(229, 35, 53, 0.04) 0%, #121824 100%);
+}
+
+.insight-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.insight-icon-wrapper {
+    width: 26px;
+    height: 26px;
+    border-radius: 5px;
+    background: rgba(229, 35, 53, 0.08);
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 9px;
 }
-.insight-title { color: #F5F7FA; font-size: 12px; font-weight: 650; margin-bottom: 5px; }
-.insight-text { color: #9CA7B9; font-size: 10.5px; line-height: 1.5; }
+
+.insight-tag {
+    font-size: 8.5px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: rgba(59, 130, 246, 0.12);
+    color: #60A5FA;
+    letter-spacing: 0.4px;
+}
+
+.insight-tag.risk-tag {
+    background: rgba(229, 35, 53, 0.14);
+    color: #F87171;
+}
+
+.insight-title {
+    color: #F8FAFC;
+    font-size: 12.5px;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.insight-text {
+    color: #94A3B8;
+    font-size: 11px;
+    line-height: 1.45;
+}
 
 /* FOOTER */
 .footer {
-    margin-top: 24px;
-    padding-top: 13px;
-    border-top: 1px solid #29354A;
+    margin-top: 32px;
+    padding-top: 16px;
+    border-top: 1px solid #1E293B;
     text-align: center;
-    color: #68758A;
-    font-size: 10px;
+    color: #64748B;
+    font-size: 10.5px;
+    font-weight: 500;
 }
 
-/* =====================================================
-   RESPONSIVE BEHAVIOR
-   - at narrower widths, columns wrap/stack naturally
-   ===================================================== */
-@media (max-width: 1000px) {
+/* RESPONSIVE BREAKPOINTS */
+@media (max-width: 1024px) {
     div[data-testid="stHorizontalBlock"] { flex-wrap: wrap; }
     div[data-testid="stHorizontalBlock"] > div {
         flex: 1 1 100%;
         min-width: 0;
     }
 }
-@media (max-width: 760px) {
+
+@media (max-width: 768px) {
     [data-testid="stSidebar"] {
         width: 220px;
         min-width: 220px;
@@ -568,11 +866,10 @@ df = load_data().copy()
 
 
 # =========================================================
-# DERIVED FEATURES (analytics logic unchanged)
+# DERIVED FEATURES (Analytics logic unchanged)
 # =========================================================
 
 high_balance_threshold = df["Balance"].quantile(0.75)
-
 df["HighBalance"] = df["Balance"] >= high_balance_threshold
 
 
@@ -591,14 +888,14 @@ df["RelationshipCategory"] = df.apply(relationship_category, axis=1)
 
 
 # =========================================================
-# SIDEBAR (native Streamlit sidebar): BRAND + NAVIGATION + FILTERS
+# SIDEBAR: BRAND + NAVIGATION + FILTERS
 # =========================================================
 
 with st.sidebar:
 
     html(f"""
     <div class="brand">
-        <div class="brand-mark">{icon("database", 21, "#FFFFFF")}</div>
+        <div class="brand-mark">{icon("building", 18, "#FFFFFF")}</div>
         <div>
             <div class="brand-name">European Bank</div>
             <div class="brand-sub">Customer Analytics</div>
@@ -607,11 +904,11 @@ with st.sidebar:
     """)
 
     html("""
-    <div class="side-label">Dashboard</div>
+    <div class="side-label">Navigation</div>
     """)
 
     page = st.radio(
-        "Dashboard",
+        "Dashboard Navigation",
         [
             "Overview",
             "Engagement Analysis",
@@ -622,12 +919,12 @@ with st.sidebar:
         label_visibility="collapsed",
     )
 
-    st.divider()
+    st.markdown("<div style='margin: 22px 0 18px 0; border-top: 1px solid #1E293B;'></div>", unsafe_allow_html=True)
 
     html(f"""
-    <div class="side-label" style="display:flex;align-items:center;gap:7px;color:#DDE2EB;font-size:11px;font-weight:600;">
-        {icon("filter", 15, PEACH)}
-        <span>Filters</span>
+    <div class="side-label" style="display:flex;align-items:center;gap:6px;color:#94A3B8;margin-bottom:12px;">
+        {icon("filter", 13, RED)}
+        <span>Filter Parameters</span>
     </div>
     """)
 
@@ -671,7 +968,7 @@ with st.sidebar:
 
 
 # =========================================================
-# APPLY FILTERS (filtering logic unchanged)
+# APPLY FILTERS (Filtering logic unchanged)
 # =========================================================
 
 filtered_df = df[
@@ -696,20 +993,21 @@ if filtered_df.empty:
 
 
 # =========================================================
-# TOP BAR + HERO (shared across pages)
+# TOP BAR + HERO (Shared across all pages)
 # =========================================================
 
 html(f"""
 <div class="topbar">
     <div class="search-box">
-        {icon("search", 17, "#7D899D")}
-        <span style="margin-left:9px;">Search customers, segments, insights...</span>
+        {icon("search", 14, "#64748B")}
+        <span style="margin-left:8px;">Search customer ID, segment, geography...</span>
     </div>
     <div class="profile">
-        <div class="profile-date">2025 Customer Dataset</div>
-        <div class="profile-ring">{icon("activity", 16, PEACH)}</div>
+        <div class="status-pill">
+            <span class="status-dot"></span>
+            <span>2025 Analytics Active</span>
+        </div>
         <div class="avatar">EA</div>
-        <div style="font-size:11px;color:#AEB7C6;">Analytics</div>
     </div>
 </div>
 """)
@@ -743,22 +1041,26 @@ if page == "Overview":
     with k1:
         html(kpi_card(
             "users", "Total Customers", f"{total_customers:,}",
-            "Customers in current selection",
+            "Customers in selection",
+            tag="SELECTION"
         ))
     with k2:
         html(kpi_card(
             "trend", "Churn Rate", f"{churn_rate:.2f}%",
-            f"{churned_customers:,} customers exited",
+            f"{churned_customers:,} exited members",
+            tag="RISK METRIC", is_risk=True
         ))
     with k3:
         html(kpi_card(
             "activity", "Active Customers", f"{active_customers:,}",
-            f"{inactive_customers:,} inactive customers",
+            f"{inactive_customers:,} inactive members",
+            tag="ENGAGEMENT"
         ))
     with k4:
         html(kpi_card(
             "wallet", "High-Value Disengaged", f"{len(high_value_disengaged):,}",
-            f"Balance at or above {high_balance_threshold:,.0f}",
+            f"Balance ≥ €{high_balance_threshold:,.0f}",
+            tag="PRIORITY RISK", is_risk=True
         ))
 
     left, right = st.columns(2)
@@ -768,12 +1070,13 @@ if page == "Overview":
         chart_panel(
             "users",
             "Customer Status",
-            "Stayed versus churned customers",
+            "Stayed versus churned customers proportion",
             donut_png(
                 [stayed, churned_customers],
                 ["Stayed", "Churned"],
                 f"{total_customers:,}",
-                "Customers",
+                "Total Customers",
+                colors=(SLATE_BAR, RED),
             ),
             img_class="donut-fit",
         )
@@ -788,8 +1091,8 @@ if page == "Overview":
         chart_panel(
             "chart",
             "Churn by Engagement",
-            "Churn rate comparison between active and inactive customers",
-            bar_chart_png(engagement_churn, figsize=(6.0, 2.8)),
+            "Churn rate comparison between active and inactive members",
+            bar_chart_png(engagement_churn, color=[RED, SLATE_BAR], figsize=(5.5, 2.1)),
         )
 
     left, right = st.columns(2)
@@ -802,8 +1105,8 @@ if page == "Overview":
         chart_panel(
             "globe",
             "Churn by Geography",
-            "Churn rate across customer regions",
-            bar_chart_png(geo_churn, figsize=(6.0, 2.8)),
+            "Churn rate across customer regional markets",
+            bar_chart_png(geo_churn, color=RED, figsize=(5.5, 2.1)),
             panel_class="panel-tall",
         )
 
@@ -817,7 +1120,7 @@ if page == "Overview":
                 "Active Customers",
                 "Inactive Customers",
                 "High-Value Disengaged",
-                "Average Balance",
+                "Average Balance (€)",
             ],
             "Value": [
                 f"{total_customers:,}",
@@ -826,23 +1129,25 @@ if page == "Overview":
                 f"{active_customers:,}",
                 f"{inactive_customers:,}",
                 f"{len(high_value_disengaged):,}",
-                f"{avg_balance:,.0f}",
+                f"€{avg_balance:,.0f}",
             ],
         })
         table_panel(
             "document",
             "Customer Summary",
-            "Key statistics for the current selection",
+            "Key baseline statistics for current selection",
             html_table(summary),
             panel_class="panel-tall",
         )
 
     html(f"""
-    <div class="section-heading">
-        <div class="section-icon">{icon("lightbulb", 20, PEACH)}</div>
-        <div>
-            <div class="section-title">Key Insights</div>
-            <div class="section-subtitle">Important findings from the customer analysis</div>
+    <div class="insight-section-wrapper">
+        <div class="section-heading" style="margin-bottom:14px;">
+            <div class="section-icon">{icon("lightbulb", 14, RED)}</div>
+            <div>
+                <div class="section-title">Key Insights & Executive Summary</div>
+                <div class="section-subtitle">Critical retention drivers and risk indicators</div>
+            </div>
         </div>
     </div>
     """)
@@ -852,22 +1157,22 @@ if page == "Overview":
         html(insight_card(
             "activity",
             "Engagement Matters",
-            "Active customers show lower churn than inactive customers, "
-            "indicating a strong association between engagement and retention.",
+            "Active customers demonstrate substantially lower churn rates compared to inactive members, confirming engagement as a primary retention lever.",
+            tag="RETENTION LEVER", is_risk=False
         ))
     with i2:
         html(insight_card(
             "wallet",
             "High-Value Risk",
-            f"{len(high_value_disengaged):,} customers have high balances but "
-            "are inactive, making them an important retention segment.",
+            f"{len(high_value_disengaged):,} customers maintain high balances (top quartile) yet remain disengaged, posing significant revenue capital risk.",
+            tag="HIGH PRIORITY", is_risk=True
         ))
     with i3:
         html(insight_card(
             "trend",
-            "Overall Churn",
-            f"{churn_rate:.2f}% of customers in the current selection have "
-            "exited, highlighting the need for targeted retention strategies.",
+            "Overall Churn Concentration",
+            f"{churn_rate:.2f}% overall churn rate indicates critical segments require targeted retention workflows and structured customer outreach.",
+            tag="KEY METRIC", is_risk=False
         ))
 
 
@@ -901,17 +1206,17 @@ elif page == "Engagement Analysis":
 
     e1, e2, e3, e4 = st.columns(4)
     with e1:
-        html(kpi_card("activity", "Active Customers", f"{active_count:,}",
-                      "Currently engaged members"))
+        html(kpi_card("activity", "Active Members", f"{active_count:,}",
+                      "Currently engaged account holders", tag="ENGAGED"))
     with e2:
         html(kpi_card("trend", "Active Churn", f"{active_churn:.2f}%",
-                      "Churn rate among active customers"))
+                      "Churn rate among active members", tag="STABLE"))
     with e3:
-        html(kpi_card("user", "Inactive Customers", f"{inactive_count:,}",
-                      "Currently disengaged members"))
+        html(kpi_card("user", "Inactive Members", f"{inactive_count:,}",
+                      "Disengaged account holders", tag="DISENGAGED", is_risk=True))
     with e4:
         html(kpi_card("chart", "Inactive Churn", f"{inactive_churn:.2f}%",
-                      "Churn rate among inactive customers"))
+                      "Churn rate among inactive members", tag="HIGH CHURN", is_risk=True))
 
     left, right = st.columns(2)
 
@@ -923,8 +1228,8 @@ elif page == "Engagement Analysis":
         chart_panel(
             "users",
             "Customer Distribution by Engagement",
-            "Number of active versus inactive customers",
-            bar_chart_png(distribution, color=PEACH, fmt="{:,.0f}"),
+            "Total volume of active versus inactive account holders",
+            bar_chart_png(distribution, color=[BLUE_ACCENT, SLATE_BAR], fmt="{:,.0f}"),
         )
 
     with right:
@@ -934,9 +1239,9 @@ elif page == "Engagement Analysis":
         )
         chart_panel(
             "chart",
-            "Churn Rate by Engagement",
-            "Churn comparison between engagement groups",
-            bar_chart_png(churn_by_engagement),
+            "Churn Rate by Engagement Group",
+            "Comparative churn rate across active and inactive cohorts",
+            bar_chart_png(churn_by_engagement, color=[SLATE_BAR, RED]),
         )
 
     display_engagement = engagement_summary.copy()
@@ -945,23 +1250,23 @@ elif page == "Engagement Analysis":
         "Engagement", "Customers", "Churned", "Churn_Rate"
     ]]
     display_engagement.columns = [
-        "Engagement", "Customers", "Churned", "Churn Rate (%)"
+        "Engagement Status", "Total Customers", "Churned Count", "Churn Rate (%)"
     ]
     table_panel(
         "document",
-        "Engagement Summary",
-        "Detailed engagement metrics",
+        "Engagement Performance Metrics",
+        "Detailed statistical breakdown by member activity level",
         html_table(
             display_engagement,
-            numeric_cols=("Customers", "Churned", "Churn Rate (%)"),
+            numeric_cols=("Total Customers", "Churned Count", "Churn Rate (%)"),
         ),
     )
 
     st.info(
-        f"Inactive customers have a churn rate of {inactive_churn:.2f}%, "
-        f"compared with {active_churn:.2f}% for active customers. "
-        f"The difference is {inactive_churn - active_churn:.2f} percentage points. "
-        "Engagement is a key retention lever for the bank."
+        f"Inactive customers present a churn rate of **{inactive_churn:.2f}%**, "
+        f"compared with **{active_churn:.2f}%** for active customers "
+        f"(a difference of **{inactive_churn - active_churn:.2f} percentage points**). "
+        "Re-engagement initiatives represent the most direct opportunity for retention enhancement."
     )
 
 
@@ -993,21 +1298,21 @@ elif page == "Product Analysis":
 
     p1, p2, p3 = st.columns(3)
     with p1:
-        html(kpi_card("box", "Most Common Product Count", f"{most_common}",
-                      "Modal number of products held"))
+        html(kpi_card("box", "Primary Holding Count", f"{most_common} Products",
+                      "Modal product holding level", tag="MOST COMMON"))
     with p2:
         html(kpi_card("chart", "Average Products", f"{avg_products:.2f}",
-                      "Mean products per customer"))
+                      "Mean products held per customer", tag="AVERAGE"))
     with p3:
         html(kpi_card("wallet", "3+ Product Customers", f"{three_plus:,}",
-                      "Small group, unusually high churn"))
+                      "High product count, elevated churn risk", tag="RISK GROUP", is_risk=True))
 
     product_chart = product_analysis.set_index("NumOfProducts")["Churn_Rate"]
     chart_panel(
         "box",
-        "Churn Rate by Number of Products",
-        "Product depth versus customer churn",
-        bar_chart_png(product_chart, figsize=(6.8, 3.3)),
+        "Churn Rate by Number of Products Held",
+        "Evaluating customer retention across product portfolio depth",
+        bar_chart_png(product_chart, color=[SLATE_BAR, SLATE_BAR, RED, RED], figsize=(6.2, 2.3)),
     )
 
     product_engagement = (
@@ -1028,24 +1333,22 @@ elif page == "Product Analysis":
         "NumOfProducts", "Engagement", "Customers", "Churned", "Churn_Rate"
     ]]
     display_pe.columns = [
-        "Products", "Engagement", "Customers", "Churned", "Churn Rate (%)"
+        "Product Count", "Engagement", "Customers", "Churned", "Churn Rate (%)"
     ]
     table_panel(
         "activity",
-        "Product Count + Engagement",
-        "Combined view of product utilization and activity",
+        "Product Depth & Engagement Cross-Analysis",
+        "Detailed matrix combining product utilization and active membership status",
         html_table(
             display_pe,
-            numeric_cols=("Products", "Customers", "Churned", "Churn Rate (%)"),
+            numeric_cols=("Product Count", "Customers", "Churned", "Churn Rate (%)"),
         ),
     )
 
     st.info(
-        "Customers with 2 products show substantially lower churn than "
-        "customers with 1 product in this dataset. Customers with 3 or more "
-        "products form a small but unusually high-churn group and should be "
-        "investigated separately. These results indicate association rather "
-        "than causation."
+        "Customers holding 2 products exhibit substantially lower churn than single-product holders. "
+        "However, customers with 3 or 4 products represent an unusually high-churn segment requiring "
+        "dedicated product simplification and relationship review."
     )
 
 
@@ -1067,16 +1370,16 @@ elif page == "High-Value Customers":
     h1, h2, h3 = st.columns(3)
     with h1:
         html(kpi_card("wallet", "High-Balance Threshold",
-                      f"{high_balance_threshold:,.0f}",
-                      "75th percentile of customer balances"))
+                      f"€{high_balance_threshold:,.0f}",
+                      "75th percentile of balance distribution", tag="THRESHOLD"))
     with h2:
         html(kpi_card("user", "High-Value Disengaged",
                       f"{len(high_value):,}",
-                      "High-balance customers who are inactive"))
+                      "Top quartile balance & disengaged", tag="AT-RISK COUNT", is_risk=True))
     with h3:
-        html(kpi_card("trend", "Their Churn Rate",
+        html(kpi_card("trend", "At-Risk Segment Churn",
                       f"{high_value_churn:.2f}%",
-                      "Churn within the disengaged segment"))
+                      "Churn rate within disengaged high-balance cohort", tag="SEGMENT CHURN", is_risk=True))
 
     high_balance_customers = filtered_df[
         filtered_df["Balance"] >= high_balance_threshold
@@ -1097,8 +1400,8 @@ elif page == "High-Value Customers":
 
     table_panel(
         "document",
-        "High-Balance Customer Comparison",
-        "Active versus inactive high-balance customers",
+        "High-Balance Cohort Comparison",
+        "Performance evaluation between active and disengaged high-balance customers",
         html_table(
             comparison,
             numeric_cols=("Customers", "Churn Rate (%)"),
@@ -1107,20 +1410,21 @@ elif page == "High-Value Customers":
 
     chart_panel(
         "chart",
-        "Churn Rate: High Balance + Active versus High Balance + Inactive",
-        "Engagement matters even among the bank's most valuable customers",
+        "Churn Rate: Active vs. Inactive High-Balance Cohorts",
+        "Demonstrating that balance size alone does not substitute for active member engagement",
         bar_chart_png(
             comparison.set_index("Group")["Churn Rate (%)"],
-            figsize=(7.4, 3.2),
+            color=[BLUE_ACCENT, RED],
+            figsize=(6.5, 2.3),
         ),
     )
 
     html(f"""
-    <div class="section-heading">
-        <div class="section-icon">{icon("users", 20, PEACH)}</div>
+    <div class="section-heading" style="margin-top:14px;">
+        <div class="section-icon">{icon("users", 14, RED)}</div>
         <div>
-            <div class="section-title">At-Risk Customer List</div>
-            <div class="section-subtitle">High-balance customers who are currently inactive</div>
+            <div class="section-title">At-Risk High-Value Customer Register</div>
+            <div class="section-subtitle">Individual account records for high-balance inactive members</div>
         </div>
     </div>
     """)
@@ -1138,13 +1442,13 @@ elif page == "High-Value Customers":
             ),
             width="stretch",
             hide_index=True,
-            height=420,
+            height=360,
         )
 
         csv = high_value[customer_columns].to_csv(index=False)
 
         st.download_button(
-            "Download At-Risk Customer List (CSV)",
+            "Export At-Risk High-Value Records (CSV)",
             csv,
             "high_value_disengaged_customers.csv",
             "text/csv",
@@ -1154,13 +1458,12 @@ elif page == "High-Value Customers":
     else:
 
         st.success(
-            "No high-value disengaged customers match the current filters."
+            "No high-value disengaged customers match the current filter selection."
         )
 
     st.info(
-        "High-balance customers should not automatically be considered "
-        "loyal. Financial value and customer engagement should be monitored "
-        "together."
+        "High-balance account holders should not be presumed loyal. "
+        "Financial capital depth must be monitored alongside account activity patterns."
     )
 
 
@@ -1201,17 +1504,17 @@ elif page == "Relationship Strength":
 
     r1, r2, r3 = st.columns(3)
     with r1:
-        html(kpi_card("heart", "Strong Relationship Customers",
+        html(kpi_card("heart", "Strong Relationship Members",
                       f"{len(strongest):,}",
-                      "Active members holding 2 products"))
+                      "Active members holding exactly 2 products", tag="STRONG"))
     with r2:
-        html(kpi_card("trend", "Strong Relationship Churn",
+        html(kpi_card("trend", "Strong Segment Churn",
                       f"{strongest_churn:.2f}%",
-                      "Churn rate within the strong segment"))
+                      "Churn rate within the strong cohort", tag="BENCHMARK"))
     with r3:
         html(kpi_card("chart", "Product-Risk Churn",
                       f"{product_risk_churn:.2f}%",
-                      "Customers holding 3 or more products"))
+                      "Churn rate for members holding 3+ products", tag="HIGH RISK", is_risk=True))
 
     relationship_chart = (
         relationship_analysis.set_index("RelationshipCategory")["Churn_Rate"]
@@ -1219,9 +1522,9 @@ elif page == "Relationship Strength":
     )
     chart_panel(
         "heart",
-        "Churn Rate by Relationship Category",
-        "Relationship strength and retention outcomes",
-        bar_chart_png(relationship_chart, figsize=(6.8, 3.3)),
+        "Churn Rate by Relationship Strength Tier",
+        "Correlation between multi-product engagement tiers and retention outcomes",
+        bar_chart_png(relationship_chart, color=[BLUE_ACCENT, SLATE_BAR, SLATE_BAR, RED], figsize=(6.2, 2.3)),
     )
 
     display_rel = relationship_analysis[[
@@ -1230,24 +1533,23 @@ elif page == "Relationship Strength":
     ]]
     display_rel["Churn_Rate"] = display_rel["Churn_Rate"].round(2)
     display_rel.columns = [
-        "Relationship Category", "Customers", "Churned",
-        "Churn Rate (%)", "Avg Balance",
+        "Relationship Category", "Total Customers", "Churned Count",
+        "Churn Rate (%)", "Avg Balance (€)",
     ]
     table_panel(
         "document",
-        "Relationship Summary",
-        "Customer distribution, churn and average balance",
+        "Relationship Category Breakdown",
+        "Distribution, churn metrics, and balance profiles across relationship tiers",
         html_table(
             display_rel,
-            numeric_cols=("Customers", "Churned", "Churn Rate (%)", "Avg Balance"),
+            numeric_cols=("Total Customers", "Churned Count", "Churn Rate (%)", "Avg Balance (€)"),
         ),
     )
 
     st.info(
-        "Strong relationship customers show substantially lower churn than "
-        "weak relationship customers. The Product-Risk category is kept "
-        "separate because customers with 3 or more products show an "
-        "unusually high churn pattern in this dataset."
+        "Strong relationship customers (Active members holding 2 products) exhibit the highest retention stability. "
+        "Conversely, the Product-Risk tier highlights that excessive product stacking without active management "
+        "correlates with elevated account exit rates."
     )
 
 
@@ -1258,15 +1560,7 @@ elif page == "Relationship Strength":
 html("""
 <div class="footer">
     European Bank Customer Analytics &nbsp;&bull;&nbsp;
-    Customer Engagement &amp; Product Utilization &nbsp;&bull;&nbsp;
-    Financial Analytics Internship
+    Customer Engagement &amp; Product Utilization Platform &nbsp;&bull;&nbsp;
+    Enterprise Intelligence System
 </div>
 """)
-
-
-
-
-
-
-
-
