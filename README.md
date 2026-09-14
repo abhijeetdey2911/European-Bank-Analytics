@@ -314,6 +314,7 @@ Customer value should be evaluated alongside engagement and product utilization.
 - Matplotlib
 - Streamlit
 - GitHub
+- Git
 
 ---
 
